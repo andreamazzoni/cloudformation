@@ -1,0 +1,184 @@
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: Network Configuration
+        Parameters: 
+          - VPCCIDR
+          - PublicSubnetCIDR
+          - PrivateSubnetCIDR
+      - 
+        Label:
+          default: NAT/Bastion Instance
+        Parameters: 
+          - InstanceType
+          - KeyName
+    ParameterLabels:
+      VPCCIDR:
+        default: The VPC IPv4 CIDR block
+      PublicSubnetCIDR:
+        default: The public subnet IPv4 CIDR block
+      PrivateSubnetCIDR:
+        default: The private subnet IPv4 CIDR block
+      InstanceType:
+        default: Instance type
+      KeyName:
+        default: SSH key pair
+
+Parameters:
+    VPCCIDR:
+      Type: String
+      Default: 10.0.0.0/16
+
+    PublicSubnetCIDR:
+      Type: String
+      Default: 10.0.1.0/24
+    
+    PrivateSubnetCIDR:
+      Type: String
+      Default: 10.0.2.0/24
+    
+    KeyName:
+      Type: AWS::EC2::KeyPair::KeyName
+      Default: aws-eu-central-1-key
+
+    InstanceType:
+      Type: String
+      Default: t2.micro
+      AllowedValues:
+        - t2.nano
+        - t2.micro
+        - t2.small
+
+Resources:
+  MyCustomVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: CustomVPC
+
+  MyPublicSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyCustomVPC
+      CidrBlock: !Ref PublicSubnetCIDR
+      AvailabilityZone: eu-central-1a
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+        - Key: Name
+          Value: CustomPublicSubnet
+
+  MyPrivateSubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyCustomVPC
+      CidrBlock: !Ref PrivateSubnetCIDR
+      AvailabilityZone: eu-central-1b
+      Tags:
+        - Key: Name
+          Value: CustomPrivateSubnet
+    
+  MyPublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref MyCustomVPC
+      Tags:
+        - Key: Name
+          Value: CustomPublicRouteTable
+    
+  MyPrivateRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref MyCustomVPC
+      Tags:
+        - Key: Name
+          Value: CustomPrivateRouteTable
+    
+  MyPublicSubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId:
+        Ref: MyPublicSubnet
+      RouteTableId:
+        Ref: MyPublicRouteTable
+    
+  MyPrivateSubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId:
+        Ref: MyPrivateSubnet
+      RouteTableId:
+        Ref: MyPrivateRouteTable
+    
+  MyIG:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CustomInternetGateway
+    
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref MyPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref MyIG
+    DependsOn:
+      - MyIG
+  
+  PrivateRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref MyPrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      InstanceId: !Ref NATInstance
+    DependsOn:
+      - NATInstance
+  
+  VPCGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref MyCustomVPC
+      InternetGatewayId: !Ref MyIG
+    
+  SSHSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: SSH
+      GroupDescription: Allow ssh to client host
+      VpcId: !Ref MyCustomVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+    
+  NATInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: ami-0245c132f10471602
+      KeyName: !Ref KeyName
+      InstanceType: !Ref InstanceType
+      SourceDestCheck: 'false'
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          GroupSet:
+            - Ref: SSHSecurityGroup
+            - !GetAtt MyCustomVPC.DefaultSecurityGroup
+          SubnetId:
+            Ref: MyPublicSubnet
+      Tags:
+        - Key: Name
+          Value: NAT Instance / Bastion
+    
+Outputs:
+  NATInstancePublicIP:
+    Description: NAT Instance public IP
+    Value: !GetAtt NATInstance.PublicIp
