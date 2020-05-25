@@ -1,0 +1,31 @@
+Parameters:
+  Subnet:
+    Type: AWS::EC2::Subnet::Id
+  
+  AMIId:
+    Type: AWS::EC2::Image::Id
+    Default: ami-06ce3edf0cff21f07
+    Description: Enter a valid  AMI ID, for example ami-06ce3edf0cff21f07
+  
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: aws-eu-central-1-key
+
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.nano
+      - t2.micro
+      - t2.small
+
+Resources:
+  EC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !Ref AMIId
+      KeyName: !Ref KeyName
+      InstanceType: !Ref InstanceType
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          SubnetId: !Ref Subnet
