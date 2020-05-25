@@ -7,20 +7,29 @@ Metadata:
         Parameters: 
           - VPCCIDR
           - PublicSubnetCIDR
+          - PublicSubnetAZ
           - PrivateSubnetCIDR
+          - PrivateSubnetAZ
       - 
         Label:
           default: NAT/Bastion Instance
         Parameters: 
+          - AMIId
           - InstanceType
           - KeyName
     ParameterLabels:
       VPCCIDR:
-        default: The VPC IPv4 CIDR block
+        default: VPC IPv4 CIDR block
       PublicSubnetCIDR:
-        default: The public subnet IPv4 CIDR block
+        default: Public subnet IPv4 CIDR block
+      PublicSubnetAZ:
+        default: Public subnet availability zone
       PrivateSubnetCIDR:
-        default: The private subnet IPv4 CIDR block
+        default: Private subnet IPv4 CIDR block
+      PrivateSubnetAZ:
+        default: Private subnet availability zone
+      AMIId:
+        default: AMI Id 
       InstanceType:
         default: Instance type
       KeyName:
@@ -34,10 +43,21 @@ Parameters:
     PublicSubnetCIDR:
       Type: String
       Default: 10.0.1.0/24
+
+    PublicSubnetAZ:
+      Type: AWS::EC2::AvailabilityZone::Name
     
     PrivateSubnetCIDR:
       Type: String
       Default: 10.0.2.0/24
+
+    PrivateSubnetAZ:
+      Type: AWS::EC2::AvailabilityZone::Name
+    
+    AMIId:
+      Type: AWS::EC2::Image::Id
+      Default: ami-01cce006e938f367e
+      Description: Enter the image ID of a valid NAT instance. Es, for eu-west-1 is ami-01cce006e938f367e
     
     KeyName:
       Type: AWS::EC2::KeyPair::KeyName
@@ -68,7 +88,7 @@ Resources:
     Properties:
       VpcId: !Ref MyCustomVPC
       CidrBlock: !Ref PublicSubnetCIDR
-      AvailabilityZone: eu-central-1a
+      AvailabilityZone: !Ref PublicSubnetAZ
       MapPublicIpOnLaunch: 'true'
       Tags:
         - Key: Name
@@ -79,7 +99,7 @@ Resources:
     Properties:
       VpcId: !Ref MyCustomVPC
       CidrBlock: !Ref PrivateSubnetCIDR
-      AvailabilityZone: eu-central-1b
+      AvailabilityZone: !Ref PrivateSubnetAZ
       Tags:
         - Key: Name
           Value: CustomPrivateSubnet
@@ -162,7 +182,7 @@ Resources:
   NATInstance:
     Type: 'AWS::EC2::Instance'
     Properties:
-      ImageId: ami-0245c132f10471602
+      ImageId: !Ref AMIId
       KeyName: !Ref KeyName
       InstanceType: !Ref InstanceType
       SourceDestCheck: 'false'
